@@ -63,7 +63,7 @@ typedef enum {
 	COLOR_ORDER_GBR,
 	COLOR_ORDER_BGR,
 	COLOR_ORDER_BRG, // Old LEDscape default
-	COLOR_ORDER_RGBW
+	COLOR_ORDER_WBRG
 } color_channel_order_t;
 
 
@@ -104,11 +104,11 @@ inline void ledscape_pixel_set_color_rgbw(
 			out_pixel->b = g;
 			out_pixel->c = b;
 		break;
-		case COLOR_ORDER_RGBW:
-			out_pixel->a = r;
-			out_pixel->b = g;
-			out_pixel->c = b;
-			out_pixel->d = w;
+		case COLOR_ORDER_WBRG:
+			out_pixel->a = w;
+			out_pixel->b = b;
+			out_pixel->c = r;
+			out_pixel->d = g;
 		break;
 		case COLOR_ORDER_RBG:
 			out_pixel->a = r;

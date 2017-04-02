@@ -715,7 +715,7 @@ int main(int argc, char ** argv)
 			fprintf(stderr, "Failed to write to config file %s: %s\n", g_config_filename, g_error_info_str);
 		}
 	}
-	if(g_server_config.color_channel_order == COLOR_ORDER_RGBW){
+	if(g_server_config.color_channel_order == COLOR_ORDER_WBRG){
 		fprintf(stderr,
 			"[main] Enabling 4 color rendering mode\n");
 		g_server_config.fcolor_enabled = TRUE;
@@ -1539,12 +1539,13 @@ void* render_thread(void* unused_data)
 				else
 					w=0;
 
-				ledscape_pixel_set_color(
+				ledscape_pixel_set_color_rgbw(
 					pixel_out,
 					color_channel_order,
 					r,
 					g,
-					b
+					b,
+					w
 				);
 
 				if (led_index == 0 && strip_index == 3) {
@@ -1775,7 +1776,7 @@ void* demo_thread(void* unused_data)
                         
 						case DEMO_MODE_POWER: {
     						buffer[data_index+2] = buffer[data_index+0] = buffer[data_index+1] = 0x00;
-    						buffer[data_index+3] = 0xff;
+    						buffer[data_index+1] = 0xff;
 						} break;
                         
 					}

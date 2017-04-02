@@ -208,7 +208,7 @@ ledscape_t * ledscape_init_with_programs(
 const char* color_channel_order_to_string(color_channel_order_t color_channel_order) {
 	switch (color_channel_order) {
 		case COLOR_ORDER_RGB: return "RGB";
-		case COLOR_ORDER_RGBW: return "RGBW";
+		case COLOR_ORDER_WBRG: return "WBRG";
 		case COLOR_ORDER_RBG: return "RBG";
 		case COLOR_ORDER_GRB: return "GRB";
 		case COLOR_ORDER_GBR: return "GBR";
@@ -237,8 +237,8 @@ color_channel_order_t color_channel_order_from_string(const char* str) {
 	else if (strcasecmp(str, "BRG") == 0) {
 		return COLOR_ORDER_BRG;
 	}
-	else if (strcasecmp(str, "RGBW") == 0) {
-		return COLOR_ORDER_RGBW;
+	else if (strcasecmp(str, "WBRG") == 0) {
+		return COLOR_ORDER_WBRG;
 	}
 	else {
 		return -1;
