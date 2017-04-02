@@ -28,7 +28,7 @@ typedef struct {
 	uint8_t a;// was blue
 	uint8_t b;// was red
 	uint8_t c;// was green
-	uint8_t unused;
+	uint8_t d;// now used for white
 } __attribute__((__packed__)) ledscape_pixel_t;
 
 
@@ -62,7 +62,8 @@ typedef enum {
 	COLOR_ORDER_GRB,
 	COLOR_ORDER_GBR,
 	COLOR_ORDER_BGR,
-	COLOR_ORDER_BRG // Old LEDscape default
+	COLOR_ORDER_BRG, // Old LEDscape default
+	COLOR_ORDER_RGBW
 } color_channel_order_t;
 
 
@@ -89,12 +90,13 @@ ledscape_draw(
 	unsigned frame
 );
 
-inline void ledscape_pixel_set_color(
+inline void ledscape_pixel_set_color_rgbw(
 	ledscape_pixel_t * const out_pixel,
 	color_channel_order_t color_channel_order,
 	uint8_t r,
 	uint8_t g,
-	uint8_t b
+	uint8_t b,
+	uint8_t w
 ) {
 	switch (color_channel_order) {
 		case COLOR_ORDER_RGB:
@@ -102,7 +104,12 @@ inline void ledscape_pixel_set_color(
 			out_pixel->b = g;
 			out_pixel->c = b;
 		break;
-
+		case COLOR_ORDER_RGBW:
+			out_pixel->a = r;
+			out_pixel->b = g;
+			out_pixel->c = b;
+			out_pixel->d = w;
+		break;
 		case COLOR_ORDER_RBG:
 			out_pixel->a = r;
 			out_pixel->b = b;
@@ -133,6 +140,36 @@ inline void ledscape_pixel_set_color(
 			out_pixel->c = g;
 		break;
 	}
+}
+
+inline void ledscape_pixel_set_color(
+	ledscape_pixel_t * const out_pixel,
+	color_channel_order_t color_channel_order,
+	uint8_t r,
+	uint8_t g,
+	uint8_t b
+) {
+	ledscape_pixel_set_color_rgbw(out_pixel, color_channel_order, r, g, b, 0);
+}
+
+inline void ledscape_set_color_rgbw(
+	ledscape_frame_t * const frame,
+	color_channel_order_t color_channel_order,
+	uint8_t strip,
+	uint16_t pixel,
+	uint8_t r,
+	uint8_t g,
+	uint8_t b,
+	uint8_t w
+) {
+	ledscape_pixel_set_color_rgbw(
+		&frame[pixel].strip[strip],
+		color_channel_order,
+		r,
+		g,
+		b,
+		w
+	);
 }
 
 inline void ledscape_set_color(

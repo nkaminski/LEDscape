@@ -79,7 +79,8 @@ typedef struct {
 	uint32_t used_strip_count;
 
 	color_channel_order_t color_channel_order;
-
+	
+	uint8_t fcolor_enabled;
 	uint8_t interpolation_enabled;
 	uint8_t dithering_enabled;
 	uint8_t lut_enabled;
@@ -240,6 +241,7 @@ server_config_t g_server_config = {
 	.interpolation_enabled = TRUE,
 	.dithering_enabled = TRUE,
 	.lut_enabled = TRUE,
+	.fcolor_enabled = FALSE,
 
 	.white_point = { .9, 1, 1},
 	.lum_power = 2,
@@ -250,6 +252,7 @@ typedef struct {
 	uint8_t r;
 	uint8_t g;
 	uint8_t b;
+	uint8_t w;
 } __attribute__((__packed__)) buffer_pixel_t;
 
 // Pixel Delta
@@ -257,10 +260,12 @@ typedef struct {
 	int8_t r;
 	int8_t g;
 	int8_t b;
+	int8_t w;
 
 	int8_t last_effect_frame_r;
 	int8_t last_effect_frame_g;
 	int8_t last_effect_frame_b;
+	int8_t last_effect_frame_w;
 } __attribute__((__packed__)) pixel_delta_t;
 
 
@@ -710,7 +715,11 @@ int main(int argc, char ** argv)
 			fprintf(stderr, "Failed to write to config file %s: %s\n", g_config_filename, g_error_info_str);
 		}
 	}
-
+	if(g_server_config.color_channel_order == COLOR_ORDER_RGBW){
+		fprintf(stderr,
+			"[main] Enabling 4 color rendering mode\n");
+		g_server_config.fcolor_enabled = TRUE;
+	}
 	fprintf(stderr,
 		"[main] Starting server on ports (tcp=%d, udp=%d) for %d pixels on %d strips\n",
 		g_server_config.tcp_port, g_server_config.udp_port, g_server_config.leds_per_strip, LEDSCAPE_NUM_STRIPS
@@ -1186,7 +1195,7 @@ void ensure_frame_data() {
 
 	pthread_mutex_lock(&g_runtime_state.mutex);
 	if (g_runtime_state.frame_size != led_count) {
-		fprintf(stderr, "Allocating buffers for %d pixels (%ju bytes)\n", led_count, (uintmax_t)(led_count * 3 /*channels*/ * 4 /*buffers*/ * sizeof(uint16_t)));
+		fprintf(stderr, "Allocating buffers for %d pixels (%ju bytes)\n", led_count, (uintmax_t)(led_count * (g_server_config.fcolor_enabled ? 4 : 3) /*channels*/ * 4 /*buffers*/ * sizeof(uint16_t)));
 
 		if (g_runtime_state.previous_frame_data != NULL) {
 			free(g_runtime_state.previous_frame_data);
@@ -1456,19 +1465,25 @@ void* render_thread(void* unused_data)
 				int32_t interpolatedR;
 				int32_t interpolatedG;
 				int32_t interpolatedB;
+				int32_t interpolatedW=0;
 
 				// Interpolate
 				if (interpolation_enabled) {
 					interpolatedR = (pixel_in_prev->r*inv_frame_progress16 + pixel_in_current->r*frame_progress16) >> 8;
 					interpolatedG = (pixel_in_prev->g*inv_frame_progress16 + pixel_in_current->g*frame_progress16) >> 8;
 					interpolatedB = (pixel_in_prev->b*inv_frame_progress16 + pixel_in_current->b*frame_progress16) >> 8;
+					if(g_server_config.fcolor_enabled)
+						interpolatedW = (pixel_in_prev->w*inv_frame_progress16 + pixel_in_current->w*frame_progress16) >> 8;
 				} else {
 					interpolatedR = pixel_in_current->r << 8;
 					interpolatedG = pixel_in_current->g << 8;
 					interpolatedB = pixel_in_current->b << 8;
+					if(g_server_config.fcolor_enabled)
+						interpolatedW = pixel_in_current->w << 8;
 				}
 
 				// Apply LUT
+				// TODO support white?
 				if (lut_enabled) {
 					interpolatedR = lutInterpolate((uint32_t) interpolatedR, g_runtime_state.red_lookup);
 					interpolatedG = lutInterpolate((uint32_t) interpolatedG, g_runtime_state.green_lookup);
@@ -1491,29 +1506,46 @@ void* render_thread(void* unused_data)
 					pixel_in_overflow->b = 0;
 					pixel_in_overflow->last_effect_frame_b = ditheringFrame;
 				}
-
+				
+				if(g_server_config.fcolor_enabled){
+					if (abs(abs(pixel_in_overflow->last_effect_frame_w) - abs(ditheringFrame)) > maxDitherFrames) {
+						pixel_in_overflow->w = 0;
+						pixel_in_overflow->last_effect_frame_w = ditheringFrame;
+					}
+				}
+				
 				// Apply dithering overflow
 				int32_t	ditheredR = interpolatedR;
 				int32_t	ditheredG = interpolatedG;
 				int32_t	ditheredB = interpolatedB;
+				int32_t	ditheredW = interpolatedW;
 
 				if (dithering_enabled) {
 					ditheredR += pixel_in_overflow->r;
 					ditheredG += pixel_in_overflow->g;
 					ditheredB += pixel_in_overflow->b;
+					if(g_server_config.fcolor_enabled)
+						ditheredW += pixel_in_overflow->w;
 				}
 
 				// Calculate and assign output values
 				uint8_t r = (uint8_t) min((ditheredR+0x80) >> 8, 255);
 				uint8_t g = (uint8_t) min((ditheredG+0x80) >> 8, 255);
 				uint8_t b = (uint8_t) min((ditheredB+0x80) >> 8, 255);
+				uint8_t w;
+				
+				if(g_server_config.fcolor_enabled)
+					w=(uint8_t) min((ditheredB+0x80) >> 8, 255);
+				else
+					w=0;
 
-				ledscape_pixel_set_color(
+				ledscape_pixel_set_color_rgbw(
 					pixel_out,
 					color_channel_order,
 					r,
 					g,
-					b
+					b,
+					w
 				);
 
 //				if (led_index == 0 && strip_index == 3) {
@@ -1524,15 +1556,19 @@ void* render_thread(void* unused_data)
 				if (r != (interpolatedR+0x80)>>8) pixel_in_overflow->last_effect_frame_r = ditheringFrame;
 				if (g != (interpolatedG+0x80)>>8) pixel_in_overflow->last_effect_frame_g = ditheringFrame;
 				if (b != (interpolatedB+0x80)>>8) pixel_in_overflow->last_effect_frame_b = ditheringFrame;
-
+				if(g_server_config.fcolor_enabled){
+					if (w != (interpolatedB+0x80)>>8) pixel_in_overflow->last_effect_frame_w = ditheringFrame;
+				}
 				// Recalculate Overflow
 				// NOTE: For some strange reason, reading the values from pixel_out causes strange memory corruption. As such
-				// we use temporary variables, r, g, and b. It probably has to do with things being loaded into the CPU cache
+				// we use temporary variables, r, g, b and if needed, w. It probably has to do with things being loaded into the CPU cache
 				// when read, as such, don't read pixel_out from here.
 				if (dithering_enabled) {
 					pixel_in_overflow->r = (uint8_t) ((int16_t)ditheredR - (r * 257));
 					pixel_in_overflow->g = (uint8_t) ((int16_t)ditheredG - (g * 257));
 					pixel_in_overflow->b = (uint8_t) ((int16_t)ditheredB - (b * 257));
+					if(g_server_config.fcolor_enabled)
+						pixel_in_overflow->w = (uint8_t) ((int16_t)ditheredW - (w * 257));
 				}
 			}
 		}
@@ -1705,7 +1741,7 @@ void* demo_thread(void* unused_data)
 
 			for (uint32_t strip = 0, data_index = 0 ; strip < LEDSCAPE_NUM_STRIPS ; strip++)
 			{
-				for (uint16_t p = 0 ; p < leds_per_strip; p++, data_index+=3)
+				for (uint16_t p = 0 ; p < leds_per_strip; p++, data_index+=(g_server_config.fcolor_enabled ? 4 : 3))
 				{
 					switch (demo_mode) {
 						case DEMO_MODE_NONE: {
