@@ -1233,13 +1233,13 @@ void set_next_frame_data(
 	rotate_frames(FALSE);
 
 	// Prevent buffer overruns
-	data_size = min(data_size, g_runtime_state.frame_size * 3);
+	data_size = min(data_size, g_runtime_state.frame_size * 4);
 
 	// Copy in new data
 	memcpy(g_runtime_state.next_frame_data, frame_data, data_size);
 
 	// Zero out any pixels not set by the new frame
-	memset((uint8_t*) g_runtime_state.next_frame_data + data_size, 0, (g_runtime_state.frame_size*3 - data_size));
+	memset((uint8_t*) g_runtime_state.next_frame_data + data_size, 0, (g_runtime_state.frame_size*4 - data_size));
 
 	// Update the timestamp & count
 	gettimeofday(&g_runtime_state.next_frame_tv, NULL);
@@ -1535,29 +1535,28 @@ void* render_thread(void* unused_data)
 				uint8_t w;
 				
 				if(g_server_config.fcolor_enabled)
-					w=(uint8_t) min((ditheredB+0x80) >> 8, 255);
+					w=(uint8_t) min((ditheredW+0x80) >> 8, 255);
 				else
 					w=0;
 
-				ledscape_pixel_set_color_rgbw(
+				ledscape_pixel_set_color(
 					pixel_out,
 					color_channel_order,
 					r,
 					g,
-					b,
-					w
+					b
 				);
 
-//				if (led_index == 0 && strip_index == 3) {
-//					printf("channel %d: %03d %03d %03d\n", strip_index, r, g, b);
-//				}
+				if (led_index == 0 && strip_index == 3) {
+					printf("channel %d: %03d %03d %03d %03d\n", strip_index, r, g, b, w);
+				}
 
 				// Check for interpolation effect
 				if (r != (interpolatedR+0x80)>>8) pixel_in_overflow->last_effect_frame_r = ditheringFrame;
 				if (g != (interpolatedG+0x80)>>8) pixel_in_overflow->last_effect_frame_g = ditheringFrame;
 				if (b != (interpolatedB+0x80)>>8) pixel_in_overflow->last_effect_frame_b = ditheringFrame;
 				if(g_server_config.fcolor_enabled){
-					if (w != (interpolatedB+0x80)>>8) pixel_in_overflow->last_effect_frame_w = ditheringFrame;
+					if (w != (interpolatedW+0x80)>>8) pixel_in_overflow->last_effect_frame_w = ditheringFrame;
 				}
 				// Recalculate Overflow
 				// NOTE: For some strange reason, reading the values from pixel_out causes strange memory corruption. As such
@@ -1713,7 +1712,7 @@ void* demo_thread(void* unused_data)
 
 		pthread_mutex_lock(&g_server_config.mutex);
 		uint32_t leds_per_strip = g_server_config.leds_per_strip;
-		uint32_t channel_count = g_server_config.leds_per_strip*3*LEDSCAPE_NUM_STRIPS;
+		uint32_t channel_count = g_server_config.leds_per_strip*4*LEDSCAPE_NUM_STRIPS;
 		demo_mode_t demo_mode = g_server_config.demo_mode;
 		pthread_mutex_unlock(&g_server_config.mutex);
 
@@ -1741,7 +1740,7 @@ void* demo_thread(void* unused_data)
 
 			for (uint32_t strip = 0, data_index = 0 ; strip < LEDSCAPE_NUM_STRIPS ; strip++)
 			{
-				for (uint16_t p = 0 ; p < leds_per_strip; p++, data_index+=(g_server_config.fcolor_enabled ? 4 : 3))
+				for (uint16_t p = 0 ; p < leds_per_strip; p++, data_index+=4)
 				{
 					switch (demo_mode) {
 						case DEMO_MODE_NONE: {
@@ -1775,7 +1774,8 @@ void* demo_thread(void* unused_data)
 						} break;
                         
 						case DEMO_MODE_POWER: {
-    						buffer[data_index] = buffer[data_index+1] = buffer[data_index+2] = 0xff;
+    						buffer[data_index+2] = buffer[data_index+0] = buffer[data_index+1] = 0x00;
+    						buffer[data_index+3] = 0xff;
 						} break;
                         
 					}
