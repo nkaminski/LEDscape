@@ -1768,6 +1768,7 @@ void* demo_thread(void* unused_data)
 								baseBrightness - (((frame_index /10) + (p*brightnessChange)/leds_per_strip + strip*10) % brightnessChange),
 								&buffer[data_index]
 							);
+							buffer[data_index+3] = (frame_index/16 % 128);
 						} break;
 
 						case DEMO_MODE_BLACK: {
