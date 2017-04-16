@@ -1766,6 +1766,8 @@ void* demo_thread(void* unused_data)
 							buffer[data_index] =
 								buffer[data_index+1] =
 									buffer[data_index+2] = 0;
+							if(g_server_config.fcolor_enabled)
+								buffer[data_index+3] = 0;
 						} break;
 
 						case DEMO_MODE_IDENTIFY: {
@@ -1775,6 +1777,10 @@ void* demo_thread(void* unused_data)
 								buffer[data_index+1] =
 									buffer[data_index+2] =
 										(uint8_t) ((strip == p) ? 170 : strip);
+							if(g_server_config.fcolor_enabled)
+								buffer[data_index+3] = 0;
+
+
 						} break;
 
 						case DEMO_MODE_FADE: {
@@ -1791,11 +1797,16 @@ void* demo_thread(void* unused_data)
 
 						case DEMO_MODE_BLACK: {
 							buffer[data_index] = buffer[data_index+1] = buffer[data_index+2] = 0;
+							if(g_server_config.fcolor_enabled)
+								buffer[data_index+3] = 0;
+
 						} break;
                         
 						case DEMO_MODE_POWER: {
-    						buffer[data_index+2] = buffer[data_index+0] = buffer[data_index+1] = 0x00;
-    						buffer[data_index+1] = 0xff;
+							buffer[data_index+0] = buffer[data_index+1] = buffer[data_index+2] = 0xff;
+							if(g_server_config.fcolor_enabled)
+								buffer[data_index+3] = 0xff;
+
 						} break;
                         
 					}
@@ -2013,7 +2024,7 @@ void* udp_server_thread(void* unused_data)
 		return NULL;
 	}
 
-	uint32_t required_packet_size = g_server_config.used_strip_count * g_server_config.leds_per_strip * 3 + sizeof(opc_cmd_t);
+	uint32_t required_packet_size = g_server_config.used_strip_count * g_server_config.leds_per_strip * (g_server_config.fcolor_enabled ? 4 : 3) + sizeof(opc_cmd_t);
 	if (required_packet_size > 65507) {
 		fprintf(stderr,
 			"[udp] OPC command for %d LEDs cannot fit in UDP packet. Use --count or --strip-count to reduce the number of required LEDs, or disable UDP server with --udp-port 0\n",
