@@ -73,6 +73,8 @@ typedef struct {
 
 	uint16_t tcp_port;
 	uint16_t udp_port;
+	
+	char e131_addr[512];
 	uint16_t e131_port;
 
 	uint32_t leds_per_strip;
@@ -231,7 +233,8 @@ server_config_t g_server_config = {
 
 	.tcp_port = 7890,
 	.udp_port = 7890,
-
+	
+	.e131_addr = "239.255.0.0",
 	.e131_port = 5568,
 
 	.leds_per_strip = 176,
@@ -347,6 +350,7 @@ static struct option long_options[] =
 		{"tcp-port", required_argument, NULL, 'p'},
 		{"udp-port", required_argument, NULL, 'P'},
 
+		{"e131-addr", required_argument, NULL, 'E'},
 		{"e131-port", required_argument, NULL, 'e'},
 
 		{"count", required_argument, NULL, 'c'},
@@ -1047,6 +1051,15 @@ int server_config_from_json(
 		output_config->color_channel_order = color_channel_order_from_string(token_value);
 	}
 
+	if ((token = find_json_token(json_tokens, "e131Address"))) {
+		strlcpy(output_config->e131_addr, token->ptr, min(sizeof(g_server_config.e131_addr), token->len + 1));
+	}
+
+	if ((token = find_json_token(json_tokens, "e131Port"))) {
+		strlcpy(token_value, token->ptr, min(sizeof(token_value), token->len + 1));
+		output_config->e131_port = (uint16_t) atoi(token_value);
+	}
+
 	if ((token = find_json_token(json_tokens, "opcTcpPort"))) {
 		strlcpy(token_value, token->ptr, min(sizeof(token_value), token->len + 1));
 		output_config->tcp_port = (uint16_t) atoi(token_value);
@@ -1113,6 +1126,8 @@ void server_config_to_json(char* dest_string, size_t dest_string_size, server_co
 			"\t" "\"usedStripCount\": %d," "\n"
 			"\t" "\"colorChannelOrder\": \"%s\"," "\n"
 
+			"\t" "\"e131Address\": \"%s\"," "\n"
+			"\t" "\"e131Port\": %d," "\n"
 			"\t" "\"opcTcpPort\": %d," "\n"
 			"\t" "\"opcUdpPort\": %d," "\n"
 
@@ -1137,6 +1152,9 @@ void server_config_to_json(char* dest_string, size_t dest_string_size, server_co
 		input_config->used_strip_count,
 
 		color_channel_order_to_string(input_config->color_channel_order),
+		
+		input_config->e131_addr,
+		input_config->e131_port,
 
 		input_config->tcp_port,
 		input_config->udp_port,
@@ -1547,11 +1565,11 @@ void* render_thread(void* unused_data)
 					b,
 					w
 				);
-
+/*
 				if (led_index == 0 && strip_index == 3) {
 					printf("channel %d: %03d %03d %03d %03d\n", strip_index, r, g, b, w);
 				}
-
+*/
 				// Check for interpolation effect
 				if (r != (interpolatedR+0x80)>>8) pixel_in_overflow->last_effect_frame_r = ditheringFrame;
 				if (g != (interpolatedG+0x80)>>8) pixel_in_overflow->last_effect_frame_g = ditheringFrame;
@@ -1887,7 +1905,7 @@ void* e131_server_thread(void* unused_data)
 	int32_t last_seq_num = -1;
 
 	// Bind to multicast
-	if (join_multicast_group_on_all_ifaces(sock, "239.255.0.0") < 0) {
+	if (join_multicast_group_on_all_ifaces(sock, g_server_config.e131_addr) < 0) {
 		fprintf(stderr, "[e131] failed to bind to multicast addresses\n");
 	}
 
