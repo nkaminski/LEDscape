@@ -282,6 +282,13 @@ lab:
                                         SBBO r_gpio2_ones, r_gpio2_addr, 0, 4; \
                                         SBBO r_gpio3_ones, r_gpio3_addr, 0, 4;
 
+#define GPIO_APPLY_MASK_TO_OUTREG()     MOV r30, r_gpio0_mask;
+                                        
+#define GPIO_APPLY_ZEROS_TO_OUTREG()    MOV r30, r_gpio0_zeros;
+                                        
+#define GPIO_APPLY_ONES_TO_OUTREG()     MOV r30, r_gpio0_ones;
+
+
 #define _IMPL_CONCAT2(a,b) a ## b
 #define CONCAT2(a,b) _IMPL_CONCAT2(a,b)
 
