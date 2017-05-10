@@ -173,6 +173,8 @@ ledscape_t * ledscape_init_with_programs(
 	};
 
 	// Configure all of our output pins.
+	/* Device tree works now! Not needed.
+
 	for (unsigned i = 0 ; i < ARRAY_COUNT(gpios0) ; i++)
 		pru_gpio(0, gpios0[i], 1, 0);
 	for (unsigned i = 0 ; i < ARRAY_COUNT(gpios1) ; i++)
@@ -181,7 +183,7 @@ ledscape_t * ledscape_init_with_programs(
 		pru_gpio(2, gpios2[i], 1, 0);
 	for (unsigned i = 0 ; i < ARRAY_COUNT(gpios3) ; i++)
 		pru_gpio(3, gpios3[i], 1, 0);
-
+	*/
 	// Initiate the PRU0 program
 	pru_exec(pru0, pru0_program_filename);
 
