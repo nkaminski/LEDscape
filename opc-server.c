@@ -50,6 +50,8 @@
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #define max(a, b) ((a) > (b) ? (a) : (b))
 
+#define E131_UNIVERSE_SIZE 512
+
 static const int MAX_CONFIG_FILE_LENGTH_BYTES = 1024*1024*10;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -76,7 +78,7 @@ typedef struct {
 	
 	char e131_addr[512];
 	uint16_t e131_port;
-    uint16_t e131_uni_offset;
+    	uint16_t e131_uni_offset;
 
 	uint32_t leds_per_strip;
 	uint32_t used_strip_count;
@@ -531,11 +533,11 @@ void handle_args(int argc, char ** argv) {
 				g_server_config.e131_port = (uint16_t) atoi(optarg);
 			} break;
 
-            case 'E': {
+	                case 'E': {
 				strlcpy(g_server_config.e131_addr,optarg,sizeof(g_server_config.e131_addr));
 			} break;
 
-            case 'o': {
+                        case 'O': {
 				g_server_config.e131_uni_offset = (uint16_t) atoi(optarg);
 			} break;
 
@@ -643,7 +645,7 @@ void handle_args(int argc, char ** argv) {
 							case 'P': printf("The UDP port to listen for OPC data on"); break;
 							case 'E': printf("The multicast address to listen for e131 data on"); break;
 							case 'e': printf("The UDP port to listen for e131 data on"); break;
-							case 'o': printf("The e131 universe offset"); break;
+							case 'O': printf("The e131 universe offset"); break;
 							case 'c': printf("The largest number of pixels connected to each output channel"); break;
 							case 's': printf("The number of used output channels (improves performance by not interpolating/dithering unused channels)"); break;
 							case 'd': printf("Alternative to --count; specifies pixel count as a dimension, e.g. 16x16 (256 pixels)"); break;
@@ -1077,7 +1079,7 @@ int server_config_from_json(
 
 	if ((token = find_json_token(json_tokens, "e131UniverseOffset"))) {
 		strlcpy(token_value, token->ptr, min(sizeof(token_value), token->len + 1));
-		output_config->e131UniverseOffset = (uint16_t) atoi(token_value);
+		output_config->e131_uni_offset = (uint16_t) atoi(token_value);
 	}
 
 	if ((token = find_json_token(json_tokens, "opcTcpPort"))) {
@@ -1958,7 +1960,6 @@ void* e131_server_thread(void* unused_data)
 
 		// Ensure the buffer
 		pthread_mutex_lock(&g_server_config.mutex);
-		uint32_t leds_per_strip = g_server_config.leds_per_strip;
 		uint32_t led_count = g_server_config.leds_per_strip * LEDSCAPE_NUM_STRIPS;
 		pthread_mutex_unlock(&g_server_config.mutex);
 
