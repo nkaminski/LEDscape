@@ -76,6 +76,7 @@ typedef struct {
 	
 	char e131_addr[512];
 	uint16_t e131_port;
+    uint16_t e131_uni_offset;
 
 	uint32_t leds_per_strip;
 	uint32_t used_strip_count;
@@ -236,6 +237,7 @@ server_config_t g_server_config = {
 	
 	.e131_addr = "239.255.0.0",
 	.e131_port = 5568,
+    .e131_uni_offset = 0,
 
 	.leds_per_strip = 176,
 	.used_strip_count = LEDSCAPE_NUM_STRIPS,
@@ -529,6 +531,14 @@ void handle_args(int argc, char ** argv) {
 				g_server_config.e131_port = (uint16_t) atoi(optarg);
 			} break;
 
+            case 'E': {
+				strlcpy(g_server_config.e131_addr,optarg,sizeof(g_server_config.e131_addr));
+			} break;
+
+            case 'o': {
+				g_server_config.e131_uni_offset = (uint16_t) atoi(optarg);
+			} break;
+
 			case 'c': {
 				g_server_config.leds_per_strip = (uint32_t) atoi(optarg);
 			} break;
@@ -631,8 +641,10 @@ void handle_args(int argc, char ** argv) {
 						switch (option_info.val) {
 							case 'p': printf("The TCP port to listen for OPC data on"); break;
 							case 'P': printf("The UDP port to listen for OPC data on"); break;
+							case 'E': printf("The multicast address to listen for e131 data on"); break;
 							case 'e': printf("The UDP port to listen for e131 data on"); break;
-							case 'c': printf("The number of pixels connected to each output channel"); break;
+							case 'o': printf("The e131 universe offset"); break;
+							case 'c': printf("The largest number of pixels connected to each output channel"); break;
 							case 's': printf("The number of used output channels (improves performance by not interpolating/dithering unused channels)"); break;
 							case 'd': printf("Alternative to --count; specifies pixel count as a dimension, e.g. 16x16 (256 pixels)"); break;
 							case 'D':
@@ -960,6 +972,9 @@ int validate_server_config(
 	// e131Port
 	assert_int_range_inclusive("e131 UDP Port", 1, 65535, input_config->e131_port);
 
+    // e131_uni_offset
+	assert_int_range_inclusive("e131 universe offset", 1, 511, input_config->e131_uni_offset);
+
 	// lumCurvePower
 	assert_double_range_inclusive("Luminance Curve Power", 0, 10, input_config->lum_power);
 
@@ -1060,6 +1075,11 @@ int server_config_from_json(
 		output_config->e131_port = (uint16_t) atoi(token_value);
 	}
 
+	if ((token = find_json_token(json_tokens, "e131UniverseOffset"))) {
+		strlcpy(token_value, token->ptr, min(sizeof(token_value), token->len + 1));
+		output_config->e131UniverseOffset = (uint16_t) atoi(token_value);
+	}
+
 	if ((token = find_json_token(json_tokens, "opcTcpPort"))) {
 		strlcpy(token_value, token->ptr, min(sizeof(token_value), token->len + 1));
 		output_config->tcp_port = (uint16_t) atoi(token_value);
@@ -1128,6 +1148,7 @@ void server_config_to_json(char* dest_string, size_t dest_string_size, server_co
 
 			"\t" "\"e131Address\": \"%s\"," "\n"
 			"\t" "\"e131Port\": %d," "\n"
+			"\t" "\"e131UniverseOffset\": %d," "\n"
 			"\t" "\"opcTcpPort\": %d," "\n"
 			"\t" "\"opcUdpPort\": %d," "\n"
 
@@ -1155,6 +1176,7 @@ void server_config_to_json(char* dest_string, size_t dest_string_size, server_co
 		
 		input_config->e131_addr,
 		input_config->e131_port,
+        input_config->e131_uni_offset,
 
 		input_config->tcp_port,
 		input_config->udp_port,
