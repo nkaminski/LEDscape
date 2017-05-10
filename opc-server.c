@@ -1967,6 +1967,8 @@ void* e131_server_thread(void* unused_data)
 			dmx_buffer_size = led_count * sizeof(buffer_pixel_t);
 			dmx_buffer = malloc(dmx_buffer_size);
 		}
+        uint16_t dmx_universe_start = 1 + g_server_config.e131_uni_offset;
+        uint16_t dmx_universe_end = dmx_universe_start + (led_count / E131_UNIVERSE_SIZE);
 
 		// Packet should be at least 126 bytes for the header
 		if (received_packet_size >= 126) {
@@ -1977,9 +1979,21 @@ void* e131_server_thread(void* unused_data)
 
 				// 1-based DMX universe
 				uint16_t dmx_universe_num = ((uint16_t)packet_buffer[113] << 8) | packet_buffer[114];
+               if(dmx_universe_end > 49){
+                    printf("[e131] %d universes needed to address %d channels with offset %d is > 48. Truncating!\n",
+                        dmx_universe_end - dmx_universe_start,
+                        led_count,
+                        dmx_universe_start);
+                    dmx_universe_end = 49;
+                } else{
+                    printf("[e131] %d universes to address %d channels assigned",
+                        dmx_universe_end - dmx_universe_start,
+                        led_count * sizeof(buffer_pixel_t));
+                }
+                if(dmx_universe_num >= dmx_universe_start &&
+                    dmx_universe_num < dmx_universe_end){
 
-				if (dmx_universe_num >= 1 && dmx_universe_num <= 48) {
-					uint16_t ledscape_channel_num = dmx_universe_num - 1;
+					uint16_t ledscape_start_universe = dmx_universe_num - dmx_universe_start;
 					// Data OK
 //					set_next_frame_single_channel_data(
 //						ledscape_channel_num,
@@ -1988,22 +2002,28 @@ void* e131_server_thread(void* unused_data)
 //						TRUE
 //					);
 
-					memcpy(
-						dmx_buffer + ledscape_channel_num * leds_per_strip * sizeof(buffer_pixel_t),
-						packet_buffer + 126,
-						min((uint)(received_packet_size - 126), led_count * sizeof(buffer_pixel_t))
-					);
+                    /* buffer is led_count * sizeof(buffer_pixel_t) long, make sure end is after start */
+                    if((ledscape_start_universe * E131_UNIVERSE_SIZE) < dmx_buffer_size){
+                        memcpy(
+                            dmx_buffer + (ledscape_start_universe * E131_UNIVERSE_SIZE),
+                            packet_buffer + 126,
+                            min((uint)(received_packet_size - 126),
+                                dmx_buffer_size - (ledscape_start_universe * E131_UNIVERSE_SIZE))
+                        );
 
-					set_next_frame_data(
-						dmx_buffer,
-						dmx_buffer_size * sizeof(buffer_pixel_t),
-						TRUE
-					);
+                        set_next_frame_data(
+                            dmx_buffer,
+                            dmx_buffer_size * sizeof(buffer_pixel_t),
+                            TRUE
+                        );
+                    }
 				} else {
 					fprintf(
 						stderr,
-						"[e131] DMX universe %d out of bounds [1,48] \n",
-						dmx_universe_num
+						"[e131] DMX universe %d out of bounds [%d,%d] \n",
+						dmx_universe_num,
+                        dmx_universe_start,
+                        dmx_universe_end
 					);
 				}
 			} else {
