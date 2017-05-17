@@ -342,6 +342,28 @@ lab:
 #define TEST_BIT_ONE(regN,channelIndex) QBBC CONCAT3(channel_,channelIndex,_one_skip), regN, r_bit_num; \
                                         SET CONCAT3(r_,CHANNEL_BANK_NAME(channelIndex),_ones), CONCAT3(r_,CHANNEL_BANK_NAME(channelIndex),_ones), CHANNEL_BIT(channelIndex); \
                                         CONCAT3(channel_,channelIndex,_one_skip): ;
+/**
+ * Checks if the bit indexed by the r_bit_num register in the regN register is a zero, and if so, sets the bit in the
+ * corresponding r_gpio0_zeros register. NO remapping is performed!
+ *
+ * @param regN The data register to check. Generally one of the r_dataN registers.
+ * @param channelIndex Which channel this check is for. Used to determine GPIO bank and bit.
+ */
+#define TEST_BIT_ZERO_NREMAP(regN,channelIndex) QBBS CONCAT3(channel_,channelIndex,_zero_skip), regN, r_bit_num; \
+                                        SET r_gpio0_zeros, r_gpio0_zeros, channelIndex; \
+                                        CONCAT3(channel_,channelIndex,_zero_skip): ;
+
+/**
+ * Checks if the bit indexed by the r_bit_num register in the regN register is a one, and if so, sets the bit in the
+ * corresponding r_gpio0_ones register.
+ *
+ * @param regN The data register to check. Generally one of the r_dataN registers.
+ * @param channelIndex Which channel this check is for. Used to determine GPIO bank and bit.
+ */
+#define TEST_BIT_ONE_NREMAP(regN,channelIndex) QBBC CONCAT3(channel_,channelIndex,_one_skip), regN, r_bit_num; \
+                                        SET r_gpio0_ones, r_gpio0_ones, channelIndex; \
+                                        CONCAT3(channel_,channelIndex,_one_skip): ;
+
 
 /**
  * Loads more LED channel data into the r_dataN registers.

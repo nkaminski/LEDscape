@@ -99,21 +99,24 @@ l_word_loop:
 		DECREMENT r_bit_num
 
 		// Load 8 registers of data, starting at r10
-		LOAD_CHANNEL_DATA(24, 0, 8)
+		LOAD_CHANNEL_DATA(8, 0, 8)
 
-		// Zero out the registers
-		RESET_GPIO_ZEROS()
+		// Zero out the ones registers
+		RESET_GPIO_ONES()
 
-		TEST_BIT_ZERO(r_data0,  0)
-		TEST_BIT_ZERO(r_data1,  1)
-		TEST_BIT_ZERO(r_data2,  2)
-		TEST_BIT_ZERO(r_data3,  3)
-		TEST_BIT_ZERO(r_data4,  4)
-		TEST_BIT_ZERO(r_data5,  5)
-		TEST_BIT_ZERO(r_data6,  6)
-		TEST_BIT_ZERO(r_data7,  7)
+		// Test the channel data and compute the value of the ones register
+		TEST_BIT_ONE_NREMAP(r_data0,  0)
+		TEST_BIT_ONE_NREMAP(r_data1,  1)
+		TEST_BIT_ONE_NREMAP(r_data2,  2)
+		TEST_BIT_ONE_NREMAP(r_data3,  3)
+		TEST_BIT_ONE_NREMAP(r_data4,  4)
+		TEST_BIT_ONE_NREMAP(r_data5,  5)
 
-		WAITNS 900, wait_one_time
+		//Shield only externalizes 1st 6 bits
+		//TEST_BIT_ONE_NREMAP(r_data6,  6)
+		//TEST_BIT_ONE_NREMAP(r_data7,  7)
+
+		WAITNS 600, wait_one_time
 		CHECK_TIMEOUT
 		// Clear previous output
 		XOR r30, r30, r30
@@ -126,7 +129,7 @@ l_word_loop:
 		// Send all the start bits
 		GPIO_APPLY_MASK_TO_OUTREG()
 
-		WAITNS 240, wait_zero_time
+		WAITNS 350, wait_zero_time
 		CHECK_TIMEOUT
 
 		// Lower the zero bit lines
