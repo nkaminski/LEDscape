@@ -1987,7 +1987,7 @@ void* e131_server_thread(void* unused_data)
                         dmx_universe_start);
                     dmx_universe_end = 49;
                 } else{
-                    printf("[e131] %d universes to address %d channels assigned",
+                    printf("[e131] %d universes to address %d channels assigned\n",
                         dmx_universe_end - dmx_universe_start,
                         led_count * sizeof(buffer_pixel_t));
                 }
