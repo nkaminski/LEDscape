@@ -101,6 +101,10 @@ l_word_loop:
 		// Load 8 registers of data, starting at r10
 		LOAD_CHANNEL_DATA(8, 0, 8)
 
+		WAITNS 500, wait_one_time
+		// Clear previous output
+		XOR r30, r30, r30
+
 		// Zero out the ones registers
 		RESET_GPIO_ONES()
 
@@ -115,11 +119,6 @@ l_word_loop:
 		//Shield only externalizes 1st 6 bits
 		//TEST_BIT_ONE_NREMAP(r_data6,  6)
 		//TEST_BIT_ONE_NREMAP(r_data7,  7)
-
-		WAITNS 600, wait_one_time
-		CHECK_TIMEOUT
-		// Clear previous output
-		XOR r30, r30, r30
 
 		// Wait until the end of the frame (including the time it takes to reset the counter)
 		WAITNS 1150, wait_frame_spacing_time
