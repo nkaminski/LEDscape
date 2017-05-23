@@ -268,12 +268,14 @@ ip address after starting `opc-server` or installing the system service.
 Hardware Tips
 ========
 
-Remember that the BBB outputs data at 3.3v. Depending on the specific LED strips, it is often possible to connect the `DI` on directly to one of the output pins on the BeagleBone, especially if the strips are high quality and the connecting wire is short. Many [recommend](https://forum.pjrc.com/threads/24648-Newbie-findings-re-WS281X-signal-quality(wire-length-resistors-and-grounds-Oh-my!) also adding an impedance  matching resistor to smooth out the signal. 
+Remember that the BBB outputs data at 3.3v. Depending on the specific LED strips, it is often possible to connect the `DI` on directly to one of the output pins on the BeagleBone, especially if the strips are high quality and the connecting wire is short. Many [recommend](https://forum.pjrc.com/threads/24648-Newbie-findings-re-WS281X-signal-quality(wire-length-resistors-and-grounds-Oh-my!) also adding an impedance  matching resistor to smooth out the signal.
+
+If long cables (over ~6 feet) are used between the first pixel and the BeagleBone Black, issues with corruption of pixel data may arise as a result of the capacitance of the long cabling, as well as due to crosstalk between signal lines run in close proximity. While slighty increasing the impedance matching resistor value to 220 ohms will lessen these detrimental effects by limiting slew rate, the use of differential signaling is required for reliable operation with long cable runs. 
 
 If your strips require 5V on `DI`, you will need to use a level-shifter of some sort. [Adafruit](http://www.adafruit.com/products/757) has a decent one which works well.  For custom circuit boards we recommend the [TI SN74LV245](http://octopart.com/partsearch#!?q=SN74LV245).
 
 While there may be others, RGB123 makes an excellent 24/48 pin cape designed 
-specifically for this version of LEDscape: [24 pin](http://rgb-123.com/product/beaglebone-black-24-output-cape/) or [48 pin](http://rgb-123.com/product/beaglebone-black-48-output-cape/)
+specifically for this version of LEDscape: [24 pin](http://rgb-123.com/product/beaglebone-black-24-output-cape/) or [48 pin](http://rgb-123.com/product/beaglebone-black-48-output-cape/) Be aware that these capes are NOT compatible with the x-r30 output modes!
 
 
 API
