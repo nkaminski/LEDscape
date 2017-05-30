@@ -1,0 +1,11 @@
+ledscape-ng (0.2-1.1) UNRELEASED; urgency=medium
+
+  * Initial package testing 
+
+ --  <pi@arm-builder.home>  Tue, 30 May 2017 16:30:43 -0500
+
+ledscape-ng (0.2-1) unstable; urgency=low
+
+  * Initial release
+
+ -- unknown <pi@arm-builder.home>  Tue, 30 May 2017 16:29:35 -0500

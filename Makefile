@@ -1,6 +1,5 @@
 #########
-#PREFIX = ./TESTINST
-PREFIX = $(DESTDIR)
+PREFIX = $(DESTDIR)/usr
 BINDIR = $(PREFIX)/bin
 ETCDIR = $(PREFIX)/etc
 LIBEXECDIR = $(PREFIX)/libexec
@@ -132,8 +131,8 @@ clean:
 		lib/cesanta/*.o \
 		pru/generated \
 		pru/bin \
-		ledscape.service
-		ledscape-sys.service
+		ledscape.service \
+		ledscape-sys.service || true
 	cd am335x/app_loader/interface && $(MAKE) clean
 	cd am335x/pasm && $(MAKE) clean
 
@@ -169,10 +168,10 @@ cscope:
 	cscope -k -buq -p4 -v
 
 install: $(TARGETS) all_pru_templates ledscape-sys.service
-	install -m755 opc-server $(BINDIR)	
+	install -m755 -D opc-server $(BINDIR)	
 	install -m755 -d $(LIBEXECDIR)/ledscape-pru-bin
 	install -m644 -t $(LIBEXECDIR)/ledscape-pru-bin pru/bin/*
-	install -m644 ledscape-sys.service $(SYSTEMD_UNIT_DIR)
+	install -m644 -D -t $(SYSTEMD_UNIT_DIR) ledscape-sys.service
 
 uninstall:
 	rm -f $(BINDIR)/opc-server

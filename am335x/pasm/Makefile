@@ -1,7 +1,7 @@
 # Builds with whatever the host format is
 CC := gcc
 
-CFLAGS += \
+CFLAGS := \
 	-O3 \
 	-W \
 	-Wall \
