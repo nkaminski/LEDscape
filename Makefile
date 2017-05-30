@@ -1,4 +1,11 @@
 #########
+PREFIX = ./TESTINST
+#PREFIX = $(DESTDIR)
+BINDIR = $(PREFIX)/bin
+ETCDIR = $(PREFIX)/etc
+LIBEXECDIR = $(PREFIX)/libexec
+SYSTEMD_UNIT_DIR = $(PREFIX)/lib/systemd/system
+
 #
 # The top level targets link in the two .o files for now.
 #
@@ -105,6 +112,10 @@ $(TARGETS):
 ledscape.service: ledscape.service.in
 	sed 's%LEDSCAPE_PATH%'`pwd`'%' ledscape.service.in > ledscape.service
 
+ledscape-sys.service: ledscape-sys.service.in
+	sed 's%BIN_DIR%'$(BINDIR)'%' ledscape-sys.service.in | sed 's%ETC_DIR%'$(ETCDIR)'%' > ledscape-sys.service
+
+
 .PHONY: clean
 
 clean:
@@ -122,6 +133,7 @@ clean:
 		pru/generated \
 		pru/bin \
 		ledscape.service
+		ledscape-sys.service
 	cd am335x/app_loader/interface && $(MAKE) clean
 	cd am335x/pasm && $(MAKE) clean
 
@@ -151,9 +163,23 @@ $(APP_LOADER_LIB):
 $(PASM):
 	$(MAKE) -C $(PASM_DIR)
 
-.PHONY: cscope
+.PHONY: cscope install
 cscope:
 	find . -name '*.[cCh]' -o -name '*.cc' >cscope.files
 	cscope -k -buq -p4 -v
+
+install: $(TARGETS) all_pru_templates ledscape-sys.service
+	install -m755 opc-server $(BINDIR)	
+	install -m755 -d $(LIBEXECDIR)/ledscape-pru-bin
+	install -m644 -t $(LIBEXECDIR)/ledscape-pru-bin pru/bin/*
+	install -m644 ledscape-sys.service $(SYSTEMD_UNIT_DIR)
+
+uninstall:
+	rm -f $(BINDIR)/opc-server
+	rm -rf $(LIBEXECDIR)/ledscape-pru-bin
+	systemctl disable ledscape-sys.service
+	rm -f $(SYSTEMD_UNIT_DIR)/ledscape-sys.service
+
+
 # Include all of the generated dependency files
 -include .*.o.d

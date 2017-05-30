@@ -17,6 +17,7 @@
 #include <string.h>
 #include <math.h>
 #include <getopt.h>
+#include <limits.h>
 #include <ifaddrs.h>
 #include <net/if.h>
 #include <sys/mman.h>
@@ -97,7 +98,7 @@ typedef struct {
 	} white_point;
 
 	float lum_power;
-
+	char pru_bin_prefix[PATH_MAX];	
 	pthread_mutex_t mutex;
 	char json[4096];
 } server_config_t;
@@ -252,6 +253,7 @@ server_config_t g_server_config = {
 
 	.white_point = { .9, 1, 1},
 	.lum_power = 2,
+	.pru_bin_prefix = "pru/bin",
 	.mutex = PTHREAD_MUTEX_INITIALIZER
 };
 
@@ -517,7 +519,7 @@ void handle_args(int argc, char ** argv) {
 	extern char *optarg;
 
 	int opt;
-	while ((opt = getopt_long(argc, argv, "p:P:c:s:d:D:o:ithlL:r:g:b:0:1:m:M:", long_options, NULL)) != -1)
+	while ((opt = getopt_long(argc, argv, "p:P:c:s:d:D:o:e:O:ithlL:r:g:b:0:1:m:M:", long_options, NULL)) != -1)
 	{
 		switch (opt)
 		{
@@ -771,7 +773,8 @@ const char* build_pruN_program_name(
 	snprintf(
 		out_pru_filename,
 		filename_len,
-		"pru/bin/%s-%s-pru%d.bin",
+		"%s/%s-%s-pru%d.bin",
+		g_server_config.pru_bin_prefix,
 		output_mode_name,
 		output_mapping_name,
 		(int) pruNum
@@ -1096,7 +1099,10 @@ int server_config_from_json(
 		strlcpy(token_value, token->ptr, min(sizeof(token_value), token->len + 1));
 		output_config->interpolation_enabled = strcasecmp(token_value, "true") == 0 ? TRUE : FALSE;
 	}
-
+	
+	if ((token = find_json_token(json_tokens, "pruBinaryPrefix"))) {
+		strlcpy(output_config->pru_bin_prefix, token->ptr, min(sizeof(g_server_config.pru_bin_prefix), token->len + 1));
+	}
 	if ((token = find_json_token(json_tokens, "enableDithering"))) {
 		strlcpy(token_value, token->ptr, min(sizeof(token_value), token->len + 1));
 		output_config->dithering_enabled = strcasecmp(token_value, "true") == 0 ? TRUE : FALSE;
@@ -1157,6 +1163,7 @@ void server_config_to_json(char* dest_string, size_t dest_string_size, server_co
 			"\t" "\"enableInterpolation\": %s," "\n"
 			"\t" "\"enableDithering\": %s," "\n"
 			"\t" "\"enableLookupTable\": %s," "\n"
+			"\t" "\"pruBinaryPrefix\": %s," "\n"
 
 			"\t" "\"lumCurvePower\": %.4f," "\n"
 			"\t" "\"whitePoint\": {" "\n"
@@ -1186,6 +1193,7 @@ void server_config_to_json(char* dest_string, size_t dest_string_size, server_co
 		input_config->interpolation_enabled ? "true" : "false",
 		input_config->dithering_enabled ? "true" : "false",
 		input_config->lut_enabled ? "true" : "false",
+		input_config->pru_bin_prefix,
 
 		(double)input_config->lum_power,
 		(double)input_config->white_point.red,
