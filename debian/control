@@ -1,0 +1,14 @@
+Source: ledscape-ng
+Section: misc
+Priority: optional
+Maintainer: Nash Kaminski <nashkaminski@kaminski.io>
+Build-Depends: debhelper (>= 9)
+Standards-Version: 3.9.5
+Homepage: https://github.com/nkaminski/LEDscape
+#Vcs-Git: git://anonscm.debian.org/collab-maint/ledscape-ng.git
+#Vcs-Browser: http://anonscm.debian.org/?p=collab-maint/ledscape-ng.git;a=summary
+
+Package: ledscape-ng
+Architecture: armhf
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Drives large quantities of LED pixels using the TI PRU

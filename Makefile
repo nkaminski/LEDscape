@@ -1,8 +1,7 @@
 #########
-#PREFIX = ./TESTINST
-PREFIX = $(DESTDIR)
+PREFIX ?= /usr
 BINDIR = $(PREFIX)/bin
-ETCDIR = $(PREFIX)/etc
+ETCDIR = /etc
 LIBEXECDIR = $(PREFIX)/libexec
 SYSTEMD_UNIT_DIR = $(PREFIX)/lib/systemd/system
 
@@ -132,8 +131,8 @@ clean:
 		lib/cesanta/*.o \
 		pru/generated \
 		pru/bin \
-		ledscape.service
-		ledscape-sys.service
+		ledscape.service \
+		ledscape-sys.service || true
 	cd am335x/app_loader/interface && $(MAKE) clean
 	cd am335x/pasm && $(MAKE) clean
 
@@ -169,16 +168,16 @@ cscope:
 	cscope -k -buq -p4 -v
 
 install: $(TARGETS) all_pru_templates ledscape-sys.service
-	install -m755 opc-server $(BINDIR)	
-	install -m755 -d $(LIBEXECDIR)/ledscape-pru-bin
-	install -m644 -t $(LIBEXECDIR)/ledscape-pru-bin pru/bin/*
-	install -m644 ledscape-sys.service $(SYSTEMD_UNIT_DIR)
+	install -m755 -D -t $(DESTDIR)$(BINDIR) opc-server
+	install -m755 -d $(DESTDIR)$(LIBEXECDIR)/ledscape-pru-bin
+	install -m644 -t $(DESTDIR)$(LIBEXECDIR)/ledscape-pru-bin pru/bin/*
+	install -m644 -D -t $(DESTDIR)$(SYSTEMD_UNIT_DIR) ledscape-sys.service
 
 uninstall:
-	rm -f $(BINDIR)/opc-server
-	rm -rf $(LIBEXECDIR)/ledscape-pru-bin
+	rm -f $(DESTDIR)$(BINDIR)/opc-server
+	rm -rf $(DESTDIR)$(LIBEXECDIR)/ledscape-pru-bin
 	systemctl disable ledscape-sys.service
-	rm -f $(SYSTEMD_UNIT_DIR)/ledscape-sys.service
+	rm -f $(DESTDIR)$(SYSTEMD_UNIT_DIR)/ledscape-sys.service
 
 
 # Include all of the generated dependency files

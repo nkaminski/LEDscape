@@ -1163,7 +1163,7 @@ void server_config_to_json(char* dest_string, size_t dest_string_size, server_co
 			"\t" "\"enableInterpolation\": %s," "\n"
 			"\t" "\"enableDithering\": %s," "\n"
 			"\t" "\"enableLookupTable\": %s," "\n"
-			"\t" "\"pruBinaryPrefix\": %s," "\n"
+			"\t" "\"pruBinaryPrefix\": \"%s\"," "\n"
 
 			"\t" "\"lumCurvePower\": %.4f," "\n"
 			"\t" "\"whitePoint\": {" "\n"
