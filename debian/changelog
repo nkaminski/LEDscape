@@ -3,10 +3,10 @@ ledscape-ng (0.2.2) UNRELEASED; urgency=medium
   [ pi@arm-builder.home ]
   * Correct systemd race on startup
 
- -- <pi@arm-builder.home>  Tue, 30 May 2017 16:30:43 -0500
+ -- Nash Kaminski <pi@arm-builder.home>  Tue, 30 May 2017 16:30:43 -0500
 
 ledscape-ng (0.2-1) unstable; urgency=low
 
   * Initial release
 
- -- unknown <pi@arm-builder.home>  Tue, 30 May 2017 16:29:35 -0500
+ --  unknown <pi@arm-builder.home>  Tue, 30 May 2017 16:29:35 -0500
