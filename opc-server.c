@@ -52,6 +52,7 @@
 #define max(a, b) ((a) > (b) ? (a) : (b))
 
 #define E131_UNIVERSE_SIZE 512
+#define UIO_TEST_HANDLE "/dev/uio0"
 
 static const int MAX_CONFIG_FILE_LENGTH_BYTES = 1024*1024*10;
 
@@ -739,6 +740,11 @@ int main(int argc, char ** argv)
 		fprintf(stderr,
 			"[main] Enabling 4 color rendering mode\n");
 		g_server_config.fcolor_enabled = TRUE;
+	}
+	//Wait in one second increments if the UIO driver is not loaded yet
+	while(access(UIO_TEST_HANDLE, F_OK ) == -1){
+		fprintf(stderr,"[main] Waiting for uio driver to load...\n");
+		usleep(1E6);
 	}
 	fprintf(stderr,
 		"[main] Starting server on ports (tcp=%d, udp=%d) for %d pixels on %d strips\n",
@@ -1979,7 +1985,8 @@ void* e131_server_thread(void* unused_data)
 			memset(dmx_buffer, 0x00, dmx_buffer_size);
 		}
 		uint16_t dmx_universe_start = 1 + g_server_config.e131_uni_offset;
-		uint16_t dmx_universe_end = dmx_universe_start + (active_chan_count / E131_UNIVERSE_SIZE);
+		// Add divisor - 1 to dividend to guarantee rounding up
+		uint16_t dmx_universe_end = dmx_universe_start + ((active_chan_count + (E131_UNIVERSE_SIZE - 1)) / E131_UNIVERSE_SIZE);
 
 		// Packet should be at least 126 bytes for the header
 		if (received_packet_size >= 126) {
