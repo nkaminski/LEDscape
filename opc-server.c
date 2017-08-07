@@ -547,7 +547,7 @@ void handle_args(int argc, char ** argv) {
 				strlcpy(g_server_config.hwmon_dev,optarg,sizeof(g_server_config.hwmon_dev));
 			} break;
             case 'h': {
-				g_server_config.hwmon_critical_temp = (int32_t) atoi(optarg);;
+				g_server_config.hwmon_max_temp = (int32_t) atoi(optarg);;
 			} break;
             case 'O': {
 				g_server_config.e131_uni_offset = (uint16_t) atoi(optarg);
