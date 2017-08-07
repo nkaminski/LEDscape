@@ -524,7 +524,7 @@ void handle_args(int argc, char ** argv) {
 	extern char *optarg;
 
 	int opt;
-	while ((opt = getopt_long(argc, argv, "p:P:c:s:d:D:E:e:O:o:ithlL:H:h:r:g:b:0:1:m:M:", long_options, NULL)) != -1)
+	while ((opt = getopt_long(argc, argv, "p:P:c:s:d:D:E:e:O:o:ithlL:H:T:r:g:b:0:1:m:M:", long_options, NULL)) != -1)
 	{
 		switch (opt)
 		{
@@ -546,7 +546,7 @@ void handle_args(int argc, char ** argv) {
             case 'H': {
 				strlcpy(g_server_config.hwmon_dev,optarg,sizeof(g_server_config.hwmon_dev));
 			} break;
-            case 'h': {
+            case 'T': {
 				g_server_config.hwmon_max_temp = (int32_t) atoi(optarg);;
 			} break;
             case 'O': {
@@ -660,7 +660,7 @@ void handle_args(int argc, char ** argv) {
 							case 'O': printf("The e131 universe offset"); break;
 							case 'c': printf("The largest number of pixels connected to each output channel"); break;
 							case 'H': printf("The path to an hwmon device that returns the system temperature"); break;
-							case 'h': printf("The maximum temperature at which the system may operate at"); break;
+							case 'T': printf("The maximum temperature at which the system may operate at"); break;
 							case 's': printf("The number of used output channels (improves performance by not interpolating/dithering unused channels)"); break;
 							case 'd': printf("Alternative to --count; specifies pixel count as a dimension, e.g. 16x16 (256 pixels)"); break;
 							case 'D':
