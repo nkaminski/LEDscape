@@ -98,8 +98,8 @@ l_word_loop:
 	l_bit_loop:
 		DECREMENT r_bit_num
 
-		// Load 8 registers of data, starting at r10
-		LOAD_CHANNEL_DATA(8, 0, 8)
+		// Load 6 registers of data, starting at r10
+		LOAD_CHANNEL_DATA(6, 0, 6)
 
 		WAITNS 500, wait_one_time
 		// Clear previous output
@@ -115,10 +115,6 @@ l_word_loop:
 		TEST_BIT_ONE_NREMAP(r_data3,  3)
 		TEST_BIT_ONE_NREMAP(r_data4,  4)
 		TEST_BIT_ONE_NREMAP(r_data5,  5)
-
-		//Shield only externalizes 1st 6 bits
-		//TEST_BIT_ONE_NREMAP(r_data6,  6)
-		//TEST_BIT_ONE_NREMAP(r_data7,  7)
 
 		// Wait until the end of the frame (including the time it takes to reset the counter)
 		WAITNS 1150, wait_frame_spacing_time
