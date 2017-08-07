@@ -360,6 +360,9 @@ static struct option long_options[] =
 		{"count", required_argument, NULL, 'c'},
 		{"strip-count", required_argument, NULL, 's'},
 		{"dimensions", required_argument, NULL, 'd'},
+        
+		{"hwmon-dev", required_argument, NULL, 'H'},
+		{"hwmon-critical-temp", required_argument, NULL, 'h'},
 
 		{"channel-order", required_argument, NULL, 'o'},
 
@@ -517,7 +520,7 @@ void handle_args(int argc, char ** argv) {
 	extern char *optarg;
 
 	int opt;
-	while ((opt = getopt_long(argc, argv, "p:P:c:s:d:D:o:ithlL:r:g:b:0:1:m:M:", long_options, NULL)) != -1)
+	while ((opt = getopt_long(argc, argv, "p:P:c:s:d:D:E:O:o:ithlL:H:h:r:g:b:0:1:m:M:", long_options, NULL)) != -1)
 	{
 		switch (opt)
 		{
@@ -533,11 +536,16 @@ void handle_args(int argc, char ** argv) {
 				g_server_config.e131_port = (uint16_t) atoi(optarg);
 			} break;
 
-	                case 'E': {
+	        case 'E': {
 				strlcpy(g_server_config.e131_addr,optarg,sizeof(g_server_config.e131_addr));
 			} break;
-
-                        case 'O': {
+            case 'H': {
+				strlcpy(g_server_config.hwmon_dev,optarg,sizeof(g_server_config.hwmon_dev));
+			} break;
+            case 'h': {
+				g_server_config.hwmon_critical_temp = (int32_t) atoi(optarg);;
+			} break;
+            case 'O': {
 				g_server_config.e131_uni_offset = (uint16_t) atoi(optarg);
 			} break;
 
@@ -647,6 +655,8 @@ void handle_args(int argc, char ** argv) {
 							case 'e': printf("The UDP port to listen for e131 data on"); break;
 							case 'O': printf("The e131 universe offset"); break;
 							case 'c': printf("The largest number of pixels connected to each output channel"); break;
+							case 'H': printf("The path to an hwmon device that returns the system temperature"); break;
+							case 'h': printf("The maximum temperature at which the system may operate at"); break;
 							case 's': printf("The number of used output channels (improves performance by not interpolating/dithering unused channels)"); break;
 							case 'd': printf("Alternative to --count; specifies pixel count as a dimension, e.g. 16x16 (256 pixels)"); break;
 							case 'D':
@@ -1040,7 +1050,16 @@ int server_config_from_json(
 	}
 
 	// Search for parameter "bar" and print it's value
-	if ((token = find_json_token(json_tokens, "outputMode"))) {
+	if ((token = find_json_token(json_tokens, "hwmonDevice"))) {
+		strlcpy(output_config->hwmon_dev, token->ptr, min(sizeof(g_server_config.hwmon_dev), token->len + 1));
+	}
+
+    if ((token = find_json_token(json_tokens, "hwmonMaxTemp"))) {
+		strlcpy(token_value, token->ptr, min(sizeof(token_value), token->len + 1));
+		output_config->hwmon_max_temp = (int32_t) atoi(token_value);
+	}
+//TODO stopped here
+    if ((token = find_json_token(json_tokens, "outputMode"))) {
 		strlcpy(output_config->output_mode_name, token->ptr, min((int)sizeof(g_server_config.output_mode_name), token->len + 1));
 	}
 
