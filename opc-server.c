@@ -80,8 +80,9 @@ typedef struct {
 	
 	char e131_addr[512];
 	uint16_t e131_port;
-    	uint16_t e131_uni_offset;
-
+    uint16_t e131_uni_offset;
+    int32_t hwmon_max_temp;
+    char[1024] hwmon_dev;
 	uint32_t leds_per_strip;
 	uint32_t used_strip_count;
 
@@ -1067,7 +1068,7 @@ int server_config_from_json(
 		strlcpy(token_value, token->ptr, min(sizeof(token_value), token->len + 1));
 		output_config->hwmon_max_temp = (int32_t) atoi(token_value);
 	}
-//TODO stopped here
+    //TODO continue integration with hwmon 
     if ((token = find_json_token(json_tokens, "outputMode"))) {
 		strlcpy(output_config->output_mode_name, token->ptr, min((int)sizeof(g_server_config.output_mode_name), token->len + 1));
 	}
