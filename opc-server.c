@@ -17,6 +17,7 @@
 #include <string.h>
 #include <math.h>
 #include <getopt.h>
+#include <limits.h>
 #include <ifaddrs.h>
 #include <net/if.h>
 #include <sys/mman.h>
@@ -51,6 +52,7 @@
 #define max(a, b) ((a) > (b) ? (a) : (b))
 
 #define E131_UNIVERSE_SIZE 512
+#define UIO_TEST_HANDLE "/dev/uio0"
 
 static const int MAX_CONFIG_FILE_LENGTH_BYTES = 1024*1024*10;
 
@@ -97,7 +99,7 @@ typedef struct {
 	} white_point;
 
 	float lum_power;
-
+	char pru_bin_prefix[PATH_MAX];	
 	pthread_mutex_t mutex;
 	char json[4096];
 } server_config_t;
@@ -252,6 +254,7 @@ server_config_t g_server_config = {
 
 	.white_point = { .9, 1, 1},
 	.lum_power = 2,
+	.pru_bin_prefix = "pru/bin",
 	.mutex = PTHREAD_MUTEX_INITIALIZER
 };
 
@@ -520,7 +523,7 @@ void handle_args(int argc, char ** argv) {
 	extern char *optarg;
 
 	int opt;
-	while ((opt = getopt_long(argc, argv, "p:P:c:s:d:D:E:O:o:ithlL:H:h:r:g:b:0:1:m:M:", long_options, NULL)) != -1)
+	while ((opt = getopt_long(argc, argv, "p:P:c:s:d:D:E:e:O:o:ithlL:H:h:r:g:b:0:1:m:M:", long_options, NULL)) != -1)
 	{
 		switch (opt)
 		{
@@ -748,6 +751,11 @@ int main(int argc, char ** argv)
 			"[main] Enabling 4 color rendering mode\n");
 		g_server_config.fcolor_enabled = TRUE;
 	}
+	//Wait in one second increments if the UIO driver is not loaded yet
+	while(access(UIO_TEST_HANDLE, F_OK ) == -1){
+		fprintf(stderr,"[main] Waiting for uio driver to load...\n");
+		usleep(1E6);
+	}
 	fprintf(stderr,
 		"[main] Starting server on ports (tcp=%d, udp=%d) for %d pixels on %d strips\n",
 		g_server_config.tcp_port, g_server_config.udp_port, g_server_config.leds_per_strip, LEDSCAPE_NUM_STRIPS
@@ -781,7 +789,8 @@ const char* build_pruN_program_name(
 	snprintf(
 		out_pru_filename,
 		filename_len,
-		"pru/bin/%s-%s-pru%d.bin",
+		"%s/%s-%s-pru%d.bin",
+		g_server_config.pru_bin_prefix,
 		output_mode_name,
 		output_mapping_name,
 		(int) pruNum
@@ -1115,7 +1124,10 @@ int server_config_from_json(
 		strlcpy(token_value, token->ptr, min(sizeof(token_value), token->len + 1));
 		output_config->interpolation_enabled = strcasecmp(token_value, "true") == 0 ? TRUE : FALSE;
 	}
-
+	
+	if ((token = find_json_token(json_tokens, "pruBinaryPrefix"))) {
+		strlcpy(output_config->pru_bin_prefix, token->ptr, min(sizeof(g_server_config.pru_bin_prefix), token->len + 1));
+	}
 	if ((token = find_json_token(json_tokens, "enableDithering"))) {
 		strlcpy(token_value, token->ptr, min(sizeof(token_value), token->len + 1));
 		output_config->dithering_enabled = strcasecmp(token_value, "true") == 0 ? TRUE : FALSE;
@@ -1176,6 +1188,7 @@ void server_config_to_json(char* dest_string, size_t dest_string_size, server_co
 			"\t" "\"enableInterpolation\": %s," "\n"
 			"\t" "\"enableDithering\": %s," "\n"
 			"\t" "\"enableLookupTable\": %s," "\n"
+			"\t" "\"pruBinaryPrefix\": \"%s\"," "\n"
 
 			"\t" "\"lumCurvePower\": %.4f," "\n"
 			"\t" "\"whitePoint\": {" "\n"
@@ -1205,6 +1218,7 @@ void server_config_to_json(char* dest_string, size_t dest_string_size, server_co
 		input_config->interpolation_enabled ? "true" : "false",
 		input_config->dithering_enabled ? "true" : "false",
 		input_config->lut_enabled ? "true" : "false",
+		input_config->pru_bin_prefix,
 
 		(double)input_config->lum_power,
 		(double)input_config->white_point.red,
@@ -1990,7 +2004,8 @@ void* e131_server_thread(void* unused_data)
 			memset(dmx_buffer, 0x00, dmx_buffer_size);
 		}
 		uint16_t dmx_universe_start = 1 + g_server_config.e131_uni_offset;
-		uint16_t dmx_universe_end = dmx_universe_start + (active_chan_count / E131_UNIVERSE_SIZE);
+		// Add divisor - 1 to dividend to guarantee rounding up
+		uint16_t dmx_universe_end = dmx_universe_start + ((active_chan_count + (E131_UNIVERSE_SIZE - 1)) / E131_UNIVERSE_SIZE);
 
 		// Packet should be at least 126 bytes for the header
 		if (received_packet_size >= 126) {

@@ -1,5 +1,8 @@
 [Unit]
 Description=LEDScape UDP Receiver
+Wants=network-online.target
+After=network-online.target
+
 
 [Service]
 WorkingDirectory=LEDSCAPE_PATH/

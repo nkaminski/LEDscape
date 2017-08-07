@@ -1,0 +1,12 @@
+[Unit]
+Description=LEDScape UDP Receiver - system wide installation
+ConditionPathExists=ETC_DIR/ledscape-config.json
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+ExecStart=BIN_DIR/opc-server --config ETC_DIR/ledscape-config.json
+KillMode=control-group
+
+[Install]
+WantedBy=multi-user.target

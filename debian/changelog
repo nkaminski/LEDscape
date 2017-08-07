@@ -1,0 +1,13 @@
+ledscape-ng (0.2.3-1) UNRELEASED; urgency=medium
+
+  [ pi@arm-builder.home ]
+  * Correct uio driver race on startup
+  * Correct universe allocation to round properly
+
+ --  <pi@arm-builder.home>  Wed, 14 Jun 2017 15:33:37 -0500
+
+ledscape-ng (0.2-1) unstable; urgency=low
+
+  * Initial release
+
+ --  unknown <pi@arm-builder.home>  Tue, 30 May 2017 16:29:35 -0500
