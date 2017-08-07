@@ -82,7 +82,7 @@ typedef struct {
 	uint16_t e131_port;
     uint16_t e131_uni_offset;
     int32_t hwmon_max_temp;
-    char[1024] hwmon_dev;
+    char hwmon_dev[4096];
 	uint32_t leds_per_strip;
 	uint32_t used_strip_count;
 
