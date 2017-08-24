@@ -2020,7 +2020,9 @@ void* e131_server_thread(void* unused_data)
                 fprintf(stderr, "Received sync packet but for wrong universe: %d\n", e131_sync_uni);
                 continue;
             }
-
+#ifdef E131_DEBUG
+            printf("Acting on -explicit- e131 sync packet...\n");
+#endif
             set_next_frame_data(
                     dmx_buffer,
                     dmx_buffer_size * sizeof(buffer_pixel_t),
@@ -2077,9 +2079,12 @@ void* e131_server_thread(void* unused_data)
                     // Increment data packet counter
                      packets_since_update ++;
 
-                    //Do not apply if force sync enabled
-                    if((packet_buffer[112] & 0x20) == 0){
-                        //force sync NOT enabled
+                    //apply if force sync enabled
+                    if((packet_buffer[112] & 0x20) != 0 || e131_sync_uni_cur == 0){
+                        //force sync
+#ifdef E131_DEBUG
+                        printf("Acting on -implicit- e131 sync...\n");
+#endif
                         set_next_frame_data(
                                 dmx_buffer,
                                 dmx_buffer_size * sizeof(buffer_pixel_t),
