@@ -20,9 +20,11 @@
 #include <limits.h>
 #include <ifaddrs.h>
 #include <net/if.h>
+#include <arpa/inet.h>
 #include <sys/mman.h>
 #include "util.h"
 #include "ledscape.h"
+#include "e131_types.h"
 
 #include "lib/cesanta/net_skeleton.h"
 #include "lib/cesanta/frozen.h"
@@ -77,17 +79,16 @@ typedef struct {
 
 	uint16_t tcp_port;
 	uint16_t udp_port;
-	
+
 	char e131_addr[512];
 	uint16_t e131_port;
     uint16_t e131_uni_offset;
-    int32_t hwmon_max_temp;
-    char hwmon_dev[4096];
+
 	uint32_t leds_per_strip;
 	uint32_t used_strip_count;
 
 	color_channel_order_t color_channel_order;
-	
+
 	uint8_t fcolor_enabled;
 	uint8_t interpolation_enabled;
 	uint8_t dithering_enabled;
@@ -100,7 +101,7 @@ typedef struct {
 	} white_point;
 
 	float lum_power;
-	char pru_bin_prefix[PATH_MAX];	
+	char pru_bin_prefix[PATH_MAX];
 	pthread_mutex_t mutex;
 	char json[4096];
 } server_config_t;
@@ -146,7 +147,7 @@ const char* demo_mode_to_string(demo_mode_t mode) {
 		case DEMO_MODE_FADE: return "fade";
 		case DEMO_MODE_IDENTIFY: return "id";
 		case DEMO_MODE_BLACK: return "black";
-		case DEMO_MODE_POWER: return "power";        
+		case DEMO_MODE_POWER: return "power";
 		default: return "<invalid demo_mode>";
 	}
 }
@@ -162,7 +163,7 @@ demo_mode_t demo_mode_from_string(const char* str) {
 		return DEMO_MODE_BLACK;
 	} else if (strcasecmp(str, "power") == 0) {
     	return DEMO_MODE_POWER;
-	} else {        
+	} else {
 		return -1;
 	}
 }
@@ -239,12 +240,12 @@ server_config_t g_server_config = {
 
 	.tcp_port = 7890,
 	.udp_port = 7890,
-	
+
 	.e131_addr = "239.255.0.0",
 	.e131_port = 5568,
 	.e131_uni_offset = 0,
 
-	.leds_per_strip = 176,
+	.leds_per_strip = 128,
 	.used_strip_count = LEDSCAPE_NUM_STRIPS,
 	.color_channel_order = COLOR_ORDER_BRG,
 
@@ -364,9 +365,6 @@ static struct option long_options[] =
 		{"count", required_argument, NULL, 'c'},
 		{"strip-count", required_argument, NULL, 's'},
 		{"dimensions", required_argument, NULL, 'd'},
-        
-		{"hwmon-dev", required_argument, NULL, 'H'},
-		{"hwmon-critical-temp", required_argument, NULL, 'h'},
 
 		{"channel-order", required_argument, NULL, 'o'},
 
@@ -524,7 +522,7 @@ void handle_args(int argc, char ** argv) {
 	extern char *optarg;
 
 	int opt;
-	while ((opt = getopt_long(argc, argv, "p:P:c:s:d:D:E:e:O:o:ithlL:H:T:r:g:b:0:1:m:M:", long_options, NULL)) != -1)
+	while ((opt = getopt_long(argc, argv, "p:P:c:s:d:D:E:e:O:o:ithlL:r:g:b:0:1:m:M:", long_options, NULL)) != -1)
 	{
 		switch (opt)
 		{
@@ -540,15 +538,10 @@ void handle_args(int argc, char ** argv) {
 				g_server_config.e131_port = (uint16_t) atoi(optarg);
 			} break;
 
-	        case 'E': {
+            case 'E': {
 				strlcpy(g_server_config.e131_addr,optarg,sizeof(g_server_config.e131_addr));
 			} break;
-            case 'H': {
-				strlcpy(g_server_config.hwmon_dev,optarg,sizeof(g_server_config.hwmon_dev));
-			} break;
-            case 'T': {
-				g_server_config.hwmon_max_temp = (int32_t) atoi(optarg);;
-			} break;
+
             case 'O': {
 				g_server_config.e131_uni_offset = (uint16_t) atoi(optarg);
 			} break;
@@ -659,8 +652,6 @@ void handle_args(int argc, char ** argv) {
 							case 'e': printf("The UDP port to listen for e131 data on"); break;
 							case 'O': printf("The e131 universe offset"); break;
 							case 'c': printf("The largest number of pixels connected to each output channel"); break;
-							case 'H': printf("The path to an hwmon device that returns the system temperature"); break;
-							case 'T': printf("The maximum temperature at which the system may operate at"); break;
 							case 's': printf("The number of used output channels (improves performance by not interpolating/dithering unused channels)"); break;
 							case 'd': printf("Alternative to --count; specifies pixel count as a dimension, e.g. 16x16 (256 pixels)"); break;
 							case 'D':
@@ -1060,15 +1051,6 @@ int server_config_from_json(
 	}
 
 	// Search for parameter "bar" and print it's value
-	if ((token = find_json_token(json_tokens, "hwmonDevice"))) {
-		strlcpy(output_config->hwmon_dev, token->ptr, min(sizeof(g_server_config.hwmon_dev), token->len + 1));
-	}
-
-    if ((token = find_json_token(json_tokens, "hwmonMaxTemp"))) {
-		strlcpy(token_value, token->ptr, min(sizeof(token_value), token->len + 1));
-		output_config->hwmon_max_temp = (int32_t) atoi(token_value);
-	}
-    //TODO continue integration with hwmon 
     if ((token = find_json_token(json_tokens, "outputMode"))) {
 		strlcpy(output_config->output_mode_name, token->ptr, min((int)sizeof(g_server_config.output_mode_name), token->len + 1));
 	}
@@ -1125,7 +1107,7 @@ int server_config_from_json(
 		strlcpy(token_value, token->ptr, min(sizeof(token_value), token->len + 1));
 		output_config->interpolation_enabled = strcasecmp(token_value, "true") == 0 ? TRUE : FALSE;
 	}
-	
+
 	if ((token = find_json_token(json_tokens, "pruBinaryPrefix"))) {
 		strlcpy(output_config->pru_bin_prefix, token->ptr, min(sizeof(g_server_config.pru_bin_prefix), token->len + 1));
 	}
@@ -1208,7 +1190,7 @@ void server_config_to_json(char* dest_string, size_t dest_string_size, server_co
 		input_config->used_strip_count,
 
 		color_channel_order_to_string(input_config->color_channel_order),
-		
+
 		input_config->e131_addr,
 		input_config->e131_port,
         input_config->e131_uni_offset,
@@ -1332,10 +1314,10 @@ void set_next_frame_data(
 
 /**
 * Rotate the buffers, dropping the previous frame and loading in the new one
-*  
+*
 * if (has_current) previous <-> current;
-* if (has_next) current <-> next    
-* 
+* if (has_next) current <-> next
+*
 */
 void rotate_frames(uint8_t lock_frame_data) {
 	if (lock_frame_data) pthread_mutex_lock(&g_runtime_state.mutex);
@@ -1419,34 +1401,34 @@ void* render_thread(void* unused_data)
 			usleep(1e6 /* 1s */);
 			continue;
 		}
-        
+
         bool interpolation_enabled = g_server_config.interpolation_enabled;
-        
+
         // If interpolation not enabled, then we only care about the current frame and want to fully display it immediately
-                
+
         if (!interpolation_enabled) {
-            
-            if (g_runtime_state.has_next_frame) {        
-                
+
+            if (g_runtime_state.has_next_frame) {
+
                 // Make the next frame the current frame
                 rotate_frames(FALSE);
             }
-            
+
             if (!g_runtime_state.has_current_frame) {
                 pthread_mutex_unlock(&g_runtime_state.mutex);
                 usleep(10e3 /* 10ms */);
                 continue;
             }
-            
+
         } else {
-            
+
             // Skip frames if there isn't enough data
             if (!g_runtime_state.has_prev_frame || !g_runtime_state.has_current_frame) {
                 pthread_mutex_unlock(&g_runtime_state.mutex);
                 usleep(10e3 /* 10ms */);
                 continue;
             }
-            
+
             // Calculate the time delta and current percentage (as a 16-bit value)
             gettimeofday(&now_tv, NULL);
             timersub(&now_tv, &g_runtime_state.next_frame_tv, &frame_progress_tv);
@@ -1484,8 +1466,8 @@ void* render_thread(void* unused_data)
                 usleep(100e3 /* 100ms */);
                 continue;
             }
-            
-        }   
+
+        }
 
 		// printf("%d of %d (%d)\n",
 		// 	(frame_progress_tv.tv_sec*1000000 + frame_progress_tv.tv_usec) ,
@@ -1520,7 +1502,7 @@ void* render_thread(void* unused_data)
 
 		// Only enable dithering if we're better than 100fps
 		bool dithering_enabled = (frame_duration_avg_usec < 10000) && g_server_config.dithering_enabled;
-		
+
 		bool lut_enabled = g_server_config.lut_enabled;
 
 		color_channel_order_t color_channel_order = g_server_config.color_channel_order;
@@ -1582,14 +1564,14 @@ void* render_thread(void* unused_data)
 					pixel_in_overflow->b = 0;
 					pixel_in_overflow->last_effect_frame_b = ditheringFrame;
 				}
-				
+
 				if(g_server_config.fcolor_enabled){
 					if (abs(abs(pixel_in_overflow->last_effect_frame_w) - abs(ditheringFrame)) > maxDitherFrames) {
 						pixel_in_overflow->w = 0;
 						pixel_in_overflow->last_effect_frame_w = ditheringFrame;
 					}
 				}
-				
+
 				// Apply dithering overflow
 				int32_t	ditheredR = interpolatedR;
 				int32_t	ditheredG = interpolatedG;
@@ -1609,7 +1591,7 @@ void* render_thread(void* unused_data)
 				uint8_t g = (uint8_t) min((ditheredG+0x80) >> 8, 255);
 				uint8_t b = (uint8_t) min((ditheredB+0x80) >> 8, 255);
 				uint8_t w;
-				
+
 				if(g_server_config.fcolor_enabled)
 					w=(uint8_t) min((ditheredW+0x80) >> 8, 255);
 				else
@@ -1859,14 +1841,14 @@ void* demo_thread(void* unused_data)
 								buffer[data_index+3] = 0;
 
 						} break;
-                        
+
 						case DEMO_MODE_POWER: {
 							buffer[data_index+0] = buffer[data_index+1] = buffer[data_index+2] = 0xff;
 							if(g_server_config.fcolor_enabled)
 								buffer[data_index+3] = 0xff;
 
 						} break;
-                        
+
 					}
 				}
 			}
@@ -1942,151 +1924,184 @@ int join_multicast_group_on_all_ifaces(
 
 void* e131_server_thread(void* unused_data)
 {
-	unused_data=unused_data; // Suppress Warnings
+    unused_data=unused_data; // Suppress Warnings
 
-	// Disable if given port 0
-	if (g_server_config.e131_port == 0) {
-		fprintf(stderr, "[e131] Not starting e131 server; Port is zero.\n");
-		pthread_exit(NULL);
-		return NULL;
-	}
+    // Disable if given port 0
+    if (g_server_config.e131_port == 0) {
+        fprintf(stderr, "[e131] Not starting e131 server; Port is zero.\n");
+        pthread_exit(NULL);
+        return NULL;
+    }
 
-	fprintf(stderr, "[e131] Starting UDP server on port %d\n", g_server_config.e131_port);
-	uint8_t packet_buffer[65536]; // e131 packet buffer
+    fprintf(stderr, "[e131] Starting UDP server on port %d\n", g_server_config.e131_port);
+    uint8_t packet_buffer[65536]; // e131 packet buffer
 
-	const int sock = socket(AF_INET6, SOCK_DGRAM, 0);
+    const int sock = socket(AF_INET6, SOCK_DGRAM, 0);
 
-	if (sock < 0)
-		die("[e131] socket failed: %s\n", strerror(errno));
+    if (sock < 0)
+        die("[e131] socket failed: %s\n", strerror(errno));
 
-	struct sockaddr_in6 addr;
-	bzero(&addr, sizeof(addr));
-	addr.sin6_family = AF_INET6;
-	addr.sin6_addr = in6addr_any;
-	addr.sin6_port = htons(g_server_config.e131_port);
+    struct sockaddr_in6 addr;
+    bzero(&addr, sizeof(addr));
+    addr.sin6_family = AF_INET6;
+    addr.sin6_addr = in6addr_any;
+    addr.sin6_port = htons(g_server_config.e131_port);
 
-	if (bind(sock, (const struct sockaddr*) &addr, sizeof(addr)) < 0) {
-		fprintf(stderr, "[e131] bind port %d failed: %s\n", g_server_config.e131_port, strerror(errno));
-		pthread_exit(NULL);
-		return NULL;
-	}
+    if (bind(sock, (const struct sockaddr*) &addr, sizeof(addr)) < 0) {
+        fprintf(stderr, "[e131] bind port %d failed: %s\n", g_server_config.e131_port, strerror(errno));
+        pthread_exit(NULL);
+        return NULL;
+    }
 
-	int32_t last_seq_num = -1;
+    int32_t last_seq_num = -1;
 
-	// Bind to multicast
-	if (join_multicast_group_on_all_ifaces(sock, g_server_config.e131_addr) < 0) {
-		fprintf(stderr, "[e131] failed to bind to multicast addresses\n");
-	}
+    // Bind to multicast
+    if (join_multicast_group_on_all_ifaces(sock, g_server_config.e131_addr) < 0) {
+        fprintf(stderr, "[e131] failed to bind to multicast addresses\n");
+    }
 
-	uint8_t* dmx_buffer = NULL;
-	uint32_t dmx_buffer_size = 0;
+    uint8_t* dmx_buffer = NULL;
+    uint32_t dmx_buffer_size = 0;
 
-	uint32_t packets_since_update = 0;
-	uint32_t frame_counter_at_last_update = g_runtime_state.frame_counter;
+    uint32_t packets_since_update = 0;
+    uint32_t frame_counter_at_last_update = g_runtime_state.frame_counter;
+    uint32_t e131_type_vect;
+    uint16_t e131_sync_uni, e131_sync_uni_cur=0;;
 
-	while (1)
-	{
-		const ssize_t received_packet_size = recv(sock, packet_buffer, sizeof(packet_buffer), 0);
-		if (received_packet_size < 0) {
-			fprintf(stderr, "[e131] recv failed: %s\n", strerror(errno));
-			continue;
-		}
+    while (1)
+    {
+        const ssize_t received_packet_size = recv(sock, packet_buffer, sizeof(packet_buffer), 0);
+        if (received_packet_size < 0) {
+            fprintf(stderr, "[e131] recv failed: %s\n", strerror(errno));
+            continue;
+        }
 
-		// Ensure the buffer
-		pthread_mutex_lock(&g_server_config.mutex);
-		uint32_t led_count = g_server_config.leds_per_strip * LEDSCAPE_NUM_STRIPS;
-		uint32_t active_chan_count = g_server_config.used_strip_count * g_server_config.leds_per_strip * sizeof(buffer_pixel_t);
-		pthread_mutex_unlock(&g_server_config.mutex);
+        // Ensure the buffer
+        pthread_mutex_lock(&g_server_config.mutex);
+        uint32_t led_count = g_server_config.leds_per_strip * LEDSCAPE_NUM_STRIPS;
+        uint32_t active_chan_count = g_server_config.used_strip_count * g_server_config.leds_per_strip * sizeof(buffer_pixel_t);
+        pthread_mutex_unlock(&g_server_config.mutex);
 
-		if (dmx_buffer == NULL || dmx_buffer_size != (led_count * sizeof(buffer_pixel_t))){
-			if (dmx_buffer != NULL) free(dmx_buffer);
-			dmx_buffer_size = led_count * sizeof(buffer_pixel_t);
-			dmx_buffer = malloc(dmx_buffer_size);
-			memset(dmx_buffer, 0x00, dmx_buffer_size);
-		}
-		uint16_t dmx_universe_start = 1 + g_server_config.e131_uni_offset;
-		// Add divisor - 1 to dividend to guarantee rounding up
-		uint16_t dmx_universe_end = dmx_universe_start + ((active_chan_count + (E131_UNIVERSE_SIZE - 1)) / E131_UNIVERSE_SIZE);
+        if (dmx_buffer == NULL || dmx_buffer_size != (led_count * sizeof(buffer_pixel_t))){
+            if (dmx_buffer != NULL) free(dmx_buffer);
+            dmx_buffer_size = led_count * sizeof(buffer_pixel_t);
+            dmx_buffer = malloc(dmx_buffer_size);
+            memset(dmx_buffer, 0x00, dmx_buffer_size);
+        }
+        uint16_t dmx_universe_start = 1 + g_server_config.e131_uni_offset;
+        // Add divisor - 1 to dividend to guarantee rounding up
+        uint16_t dmx_universe_end = dmx_universe_start + ((active_chan_count + (E131_UNIVERSE_SIZE - 1)) / E131_UNIVERSE_SIZE);
 
-		// Packet should be at least 126 bytes for the header
-		if (received_packet_size >= 126) {
-			int32_t current_seq_num = packet_buffer[111];
+        // Data packet should be at least 126 bytes, all packets must be over 49 bytes
+        if (received_packet_size < 49) {
+            fprintf(stderr, "[e131] packet too small: %d < 49 \n", received_packet_size);
+            continue;
+        }
+        //Check sequence number
+        int32_t current_seq_num = packet_buffer[111];
+        if (last_seq_num != -1 &&
+                current_seq_num < last_seq_num &&
+                (last_seq_num - current_seq_num) < 64) {
 
-			if (last_seq_num == -1 || current_seq_num >= last_seq_num || (last_seq_num - current_seq_num) > 64) {
-				last_seq_num = current_seq_num;
+            //Out of sequence packet
+            fprintf(stderr, "[e131] out of order packet; current %d, old %d \n", current_seq_num, last_seq_num);
+            continue;
+        }
 
-				// 1-based DMX universe
-				uint16_t dmx_universe_num = ((uint16_t)packet_buffer[113] << 8) | packet_buffer[114];
-				if(dmx_universe_end > 49){
-					printf("[e131] %d universes needed to address %d channels with offset %d is > 48. Truncating!\n",
-							dmx_universe_end - dmx_universe_start,
-							active_chan_count,
-							dmx_universe_start);
-					dmx_universe_end = 49;
-				} else{
-					printf("[e131] %d universes to address %d channels assigned\n",
-							dmx_universe_end - dmx_universe_start,
-							active_chan_count);
-				}
-				if(dmx_universe_num >= dmx_universe_start &&
-						dmx_universe_num < dmx_universe_end){
+        last_seq_num = current_seq_num;
 
-					uint16_t ledscape_start_universe = dmx_universe_num - dmx_universe_start;
-					// Data OK
-					//					set_next_frame_single_channel_data(
-					//						ledscape_channel_num,
-					//						packet_buffer + 126,
-					//						received_packet_size - 126,
-					//						TRUE
-					//					);
+        //Read type vector and act on the packet appropriately
+        e131_type_vect = ntohl(*((uint32_t *)(packet_buffer+40)));
 
-					/* buffer is led_count * sizeof(buffer_pixel_t) long, make sure end is after start */
-					if((ledscape_start_universe * E131_UNIVERSE_SIZE) < dmx_buffer_size){
-						memcpy(
-								dmx_buffer + (ledscape_start_universe * E131_UNIVERSE_SIZE),
-								packet_buffer + 126,
-								min((uint)(received_packet_size - 126),
-									dmx_buffer_size - (ledscape_start_universe * E131_UNIVERSE_SIZE))
-						      );
+        if(e131_type_vect == VECTOR_E131_EXTENDED_SYNCHRONIZATION && e131_sync_uni_cur != 0){
+            //Handle sync packet by immediately updating the frame and forcing an update
+            e131_sync_uni = ntohs(*((uint16_t *)(packet_buffer+45)));
+            if(e131_sync_uni != e131_sync_uni_cur){
+                fprintf(stderr, "Received sync packet but for wrong universe: %d\n", e131_sync_uni);
+                continue;
+            }
 
-						set_next_frame_data(
-								dmx_buffer,
-								dmx_buffer_size * sizeof(buffer_pixel_t),
-								TRUE
-								);
-					}
-				} else {
-					fprintf(
-							stderr,
-							"[e131] DMX universe %d out of bounds [%d,%d] \n",
-							dmx_universe_num,
-							dmx_universe_start,
-							dmx_universe_end
-					       );
-				}
-			} else {
-				// Out of order sequence packet
-				fprintf(stderr, "[e131] out of order packet; current %d, old %d \n", current_seq_num, last_seq_num);
-			}
-		} else {
-			fprintf(stderr, "[e131] packet too small: %d < 126 \n", received_packet_size);
-		}
+            set_next_frame_data(
+                    dmx_buffer,
+                    dmx_buffer_size * sizeof(buffer_pixel_t),
+                    TRUE
+                    );
+            //Wait for an update
+            while (g_runtime_state.frame_counter == frame_counter_at_last_update)
+                usleep(1e3 /* 1ms */);
 
-		// Increment counter
-		packets_since_update ++;
-		if (g_runtime_state.frame_counter != frame_counter_at_last_update) {
-			packets_since_update = 0;
-			frame_counter_at_last_update = g_runtime_state.frame_counter;
-		}
+        }
+        else if(e131_type_vect == VECTOR_E131_DATA_PACKET){
+            if (received_packet_size < 126) {
+                fprintf(stderr, "[e131] data packet too small: %d < 126 \n", received_packet_size);
+                continue;
+            }
 
-		if (packets_since_update >= LEDSCAPE_NUM_STRIPS) {
-			// Force an update here
-			while (g_runtime_state.frame_counter == frame_counter_at_last_update)
-				usleep(1e3 /* 1ms */);
-		}
-	}
+            //Capture the sync universe of the data packet and save it
+            e131_sync_uni_cur = ntohs(*((uint16_t *)(packet_buffer+109)));
 
-	pthread_exit(NULL);
+            // 1-based DMX universe
+            uint16_t dmx_universe_num = ((uint16_t)packet_buffer[113] << 8) | packet_buffer[114];
+            if(dmx_universe_end > 49){
+                printf("[e131] %d universes needed to address %d channels with offset %d is > 48. Truncating!\n",
+                        dmx_universe_end - dmx_universe_start,
+                        active_chan_count,
+                        dmx_universe_start);
+                dmx_universe_end = 49;
+            } else{
+                printf("[e131] %d universes to address %d channels assigned\n",
+                        dmx_universe_end - dmx_universe_start,
+                        active_chan_count);
+            }
+            if(dmx_universe_num >= dmx_universe_start &&
+                    dmx_universe_num < dmx_universe_end){
+
+                uint16_t ledscape_start_universe = dmx_universe_num - dmx_universe_start;
+                // Data OK
+                //					set_next_frame_single_channel_data(
+                //						ledscape_channel_num,
+                //						packet_buffer + 126,
+                //						received_packet_size - 126,
+                //						TRUE
+                //					);
+
+                /* buffer is led_count * sizeof(buffer_pixel_t) long, make sure end is after start */
+                if((ledscape_start_universe * E131_UNIVERSE_SIZE) < dmx_buffer_size){
+                    memcpy(
+                            dmx_buffer + (ledscape_start_universe * E131_UNIVERSE_SIZE),
+                            packet_buffer + 126,
+                            min((uint)(received_packet_size - 126),
+                                dmx_buffer_size - (ledscape_start_universe * E131_UNIVERSE_SIZE))
+                          );
+
+                    // Increment data packet counter
+                     packets_since_update ++;
+
+                    //Do not apply if force sync enabled
+                    if((packet_buffer[112] & 0x20) == 0){
+                        //force sync NOT enabled
+                        set_next_frame_data(
+                                dmx_buffer,
+                                dmx_buffer_size * sizeof(buffer_pixel_t),
+                                TRUE
+                                );
+                        if (packets_since_update >= dmx_universe_end - dmx_universe_start) {
+                            // Force an update here
+                            while (g_runtime_state.frame_counter == frame_counter_at_last_update)
+                                usleep(1e3 /* 1ms */);
+                        }
+                    }
+                }
+            }
+        }
+        //Finish handling a valid packet
+        if (g_runtime_state.frame_counter != frame_counter_at_last_update) {
+            packets_since_update = 0;
+            frame_counter_at_last_update = g_runtime_state.frame_counter;
+        }
+    }
+
+    pthread_exit(NULL);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
