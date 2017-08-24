@@ -2085,7 +2085,7 @@ void* e131_server_thread(void* unused_data)
                                 dmx_buffer_size * sizeof(buffer_pixel_t),
                                 TRUE
                                 );
-                        if (packets_since_update >= dmx_universe_end - dmx_universe_start) {
+                        if (packets_since_update >= (unsigned int)(dmx_universe_end - dmx_universe_start)) {
                             // Force an update here
                             while (g_runtime_state.frame_counter == frame_counter_at_last_update)
                                 usleep(1e3 /* 1ms */);
